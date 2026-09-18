@@ -1,56 +1,86 @@
-const CACHE_NAME = 'block-blast-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './game.js',
-  './manifest.json'
+"use strict";
+
+const CACHE_NAME = "block-blast-v1";
+
+const CORE_FILES = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./game.js",
+  "./manifest.json",
+  "./sw.js"
 ];
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(CORE_FILES))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then(cacheNames => {
+        return Promise.all(
+          cacheNames
+            .filter(name => name !== CACHE_NAME)
+            .map(name => caches.delete(name))
+        );
+      })
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") {
+    return;
+  }
+
+  const requestUrl = new URL(
+    event.request.url
+  );
+
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+    caches.match(event.request)
+      .then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        return response;
-      });
-    }).catch(() => {
-      if (event.request.mode === 'navigate') {
-        return caches.match('./index.html');
-      }
-    })
+
+        return fetch(event.request)
+          .then(networkResponse => {
+            if (
+              !networkResponse ||
+              networkResponse.status !== 200 ||
+              networkResponse.type === "opaque"
+            ) {
+              return networkResponse;
+            }
+
+            const responseClone =
+              networkResponse.clone();
+
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                cache.put(
+                  event.request,
+                  responseClone
+                );
+              })
+              .catch(() => {});
+
+            return networkResponse;
+          })
+          .catch(() => {
+            return caches.match("./index.html");
+          });
+      })
   );
 });
