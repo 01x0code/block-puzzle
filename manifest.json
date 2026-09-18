@@ -1,0 +1,17 @@
+{
+  "name": "Block Blast PWA",
+  "short_name": "BlockBlast",
+  "description": "Addictive classic block puzzle game",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f111a",
+  "theme_color": "#0f111a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236C5CE7'/><rect x='20' y='20' width='25' height='25' rx='5' fill='%2300CEC9'/><rect x='55' y='20' width='25' height='25' rx='5' fill='%23FF7675'/><rect x='20' y='55' width='25' height='25' rx='5' fill='%23FDCB6E'/><rect x='55' y='55' width='25' height='25' rx='5' fill='%2300B894'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
