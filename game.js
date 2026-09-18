@@ -1,441 +1,1644 @@
-class SoundEngine {
-  constructor() {
-    this.ctx = null;
-  }
+"use strict";
 
-  init() {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-  }
-
-  playPlace() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(160, this.ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.08);
-  }
-
-  playClear(linesCount) {
-    if (!this.ctx) return;
-    const baseFreq = 440 + linesCount * 120;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.6, this.ctx.currentTime + 0.25);
-    gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.25);
-  }
-
-  playGameOver() {
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(280, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(70, this.ctx.currentTime + 0.5);
-    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.5);
-  }
-}
-
-const SHAPES = [
-  { shape: [[1]], color: '#00cec9' },
-  { shape: [[1, 1]], color: '#74b9ff' },
-  { shape: [[1], [1]], color: '#74b9ff' },
-  { shape: [[1, 1, 1]], color: '#0984e3' },
-  { shape: [[1], [1], [1]], color: '#0984e3' },
-  { shape: [[1, 1, 1, 1]], color: '#6c5ce7' },
-  { shape: [[1], [1], [1], [1]], color: '#6c5ce7' },
-  { shape: [[1, 1], [1, 1]], color: '#fdcb6e' },
-  { shape: [[1, 1, 1], [1, 1, 1], [1, 1, 1]], color: '#e17055' },
-  { shape: [[1, 0], [1, 1]], color: '#e84393' },
-  { shape: [[0, 1], [1, 1]], color: '#e84393' },
-  { shape: [[1, 1], [1, 0]], color: '#e84393' },
-  { shape: [[1, 1], [0, 1]], color: '#e84393' },
-  { shape: [[1, 1, 1], [0, 1, 0]], color: '#00b894' },
-  { shape: [[0, 1, 0], [1, 1, 1]], color: '#00b894' },
-  { shape: [[1, 0], [1, 1], [1, 0]], color: '#00b894' },
-  { shape: [[0, 1], [1, 1], [0, 1]], color: '#00b894' },
-  { shape: [[1, 0, 0], [1, 0, 0], [1, 1, 1]], color: '#a29bfe' },
-  { shape: [[0, 0, 1], [0, 0, 1], [1, 1, 1]], color: '#a29bfe' },
-  { shape: [[1, 1, 1], [1, 0, 0], [1, 0, 0]], color: '#a29bfe' },
-  { shape: [[1, 1, 1], [0, 0, 1], [0, 0, 1]], color: '#a29bfe' }
-];
+/* =========================================================
+   CONSTANTS
+========================================================= */
 
 const BOARD_SIZE = 8;
-let boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
-let currentPieces = [null, null, null];
-let score = 0;
-let highScore = parseInt(localStorage.getItem('block_blast_highscore')) || 0;
-let comboCount = 0;
-let dragState = null;
+const PIECE_COUNT = 3;
+const STORAGE_KEY = "blockBlastHighScore";
+const SOUND_STORAGE_KEY = "blockBlastSoundEnabled";
+const CLEAR_ANIMATION_MS = 290;
 
-const audio = new SoundEngine();
+const COLORS = [
+  "#7C6CFF",
+  "#FF6688",
+  "#38CFFF",
+  "#FFB84D",
+  "#5DE3A5",
+  "#D875FF",
+  "#FF7E5F"
+];
 
-const boardEl = document.getElementById('board');
-const pieceSlots = document.querySelectorAll('.piece-slot');
-const scoreEl = document.getElementById('score');
-const highScoreEl = document.getElementById('high-score');
-const comboPopupEl = document.getElementById('combo-popup');
-const gameOverModal = document.getElementById('game-over-modal');
-const restartBtn = document.getElementById('restart-btn');
+const SHAPES = [
+  [[1]],
 
-function initGame() {
-  boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
-  score = 0;
-  comboCount = 0;
-  updateScore(0);
-  highScoreEl.textContent = highScore;
-  createBoardDOM();
-  spawnPieces();
-  gameOverModal.classList.add('hidden');
+  [[1, 1]],
+  [[1], [1]],
+
+  [[1, 1, 1]],
+  [[1], [1], [1]],
+
+  [[1, 1, 1, 1]],
+  [[1], [1], [1], [1]],
+
+  [
+    [1, 1],
+    [1, 1]
+  ],
+
+  [
+    [1, 0],
+    [1, 1]
+  ],
+
+  [
+    [0, 1],
+    [1, 1]
+  ],
+
+  [
+    [1, 1],
+    [1, 0]
+  ],
+
+  [
+    [1, 1],
+    [0, 1]
+  ],
+
+  [
+    [1, 1, 1],
+    [0, 1, 0]
+  ],
+
+  [
+    [0, 1, 0],
+    [1, 1, 1]
+  ],
+
+  [
+    [1, 0],
+    [1, 1],
+    [1, 0]
+  ],
+
+  [
+    [0, 1],
+    [1, 1],
+    [0, 1]
+  ],
+
+  [
+    [1, 1, 0],
+    [0, 1, 1]
+  ],
+
+  [
+    [0, 1, 1],
+    [1, 1, 0]
+  ],
+
+  [
+    [1, 0, 0],
+    [1, 1, 1]
+  ],
+
+  [
+    [0, 0, 1],
+    [1, 1, 1]
+  ],
+
+  [
+    [1, 1],
+    [1, 0],
+    [1, 0]
+  ],
+
+  [
+    [1, 1],
+    [0, 1],
+    [0, 1]
+  ]
+];
+
+/* =========================================================
+   DOM REFERENCES
+========================================================= */
+
+const boardElement = document.getElementById("board");
+const pieceTrayElement = document.getElementById("pieceTray");
+
+const scoreElement = document.getElementById("score");
+const highScoreElement = document.getElementById("highScore");
+
+const comboBadge = document.getElementById("comboBadge");
+const comboValueElement = document.getElementById("comboValue");
+
+const scorePopupsElement = document.getElementById("scorePopups");
+
+const dragGhost = document.getElementById("dragGhost");
+
+const gameOverOverlay = document.getElementById("gameOverOverlay");
+const finalScoreElement = document.getElementById("finalScore");
+const finalHighScoreElement = document.getElementById("finalHighScore");
+const restartButton = document.getElementById("restartButton");
+
+const soundButton = document.getElementById("soundButton");
+const soundIcon = document.getElementById("soundIcon");
+
+/* =========================================================
+   GAME STATE
+========================================================= */
+
+const state = {
+  board: [],
+  pieces: [],
+  score: 0,
+  highScore: 0,
+  combo: 0,
+  gameOver: false,
+  inputLocked: false,
+  drag: null,
+  soundEnabled: true,
+  audioContext: null,
+  audioMaster: null
+};
+
+/* =========================================================
+   UTILITY
+========================================================= */
+
+function createEmptyBoard() {
+  return Array.from(
+    { length: BOARD_SIZE },
+    () => Array(BOARD_SIZE).fill(null)
+  );
 }
 
-function createBoardDOM() {
-  boardEl.innerHTML = '';
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const cell = document.createElement('div');
-      cell.classList.add('cell');
-      cell.dataset.row = r;
-      cell.dataset.col = c;
-      boardEl.appendChild(cell);
-    }
-  }
+function randomItem(array) {
+  return array[Math.floor(Math.random() * array.length)];
 }
 
-function renderBoard() {
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const cell = boardEl.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-      cell.className = 'cell';
-      cell.style.backgroundColor = '';
-      if (boardState[r][c]) {
-        cell.classList.add('filled');
-        cell.style.backgroundColor = boardState[r][c];
+function cloneMatrix(matrix) {
+  return matrix.map(row => [...row]);
+}
+
+function getShapeCells(matrix) {
+  const cells = [];
+
+  for (let row = 0; row < matrix.length; row++) {
+    for (let col = 0; col < matrix[row].length; col++) {
+      if (matrix[row][col]) {
+        cells.push({ row, col });
       }
     }
   }
+
+  return cells;
 }
 
-function spawnPieces() {
-  for (let i = 0; i < 3; i++) {
-    const randomPiece = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-    currentPieces[i] = randomPiece;
-    renderPieceInSlot(i, randomPiece);
-  }
+function formatNumber(value) {
+  return Math.max(0, Math.floor(value)).toLocaleString("en-US");
 }
 
-function renderPieceInSlot(slotIndex, piece) {
-  const slot = pieceSlots[slotIndex];
-  slot.innerHTML = '';
-  if (!piece) return;
+function delay(milliseconds) {
+  return new Promise(resolve => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
 
-  const pieceGrid = document.createElement('div');
-  pieceGrid.classList.add('piece-grid');
-  const rows = piece.shape.length;
-  const cols = piece.shape[0].length;
-  pieceGrid.style.gridTemplateColumns = `repeat(${cols}, 18px)`;
-  pieceGrid.style.gridTemplateRows = `repeat(${rows}, 18px)`;
+/* =========================================================
+   PERSISTENCE
+========================================================= */
 
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const block = document.createElement('div');
-      if (piece.shape[r][c]) {
-        block.classList.add('piece-block');
-        block.style.backgroundColor = piece.color;
-      }
-      pieceGrid.appendChild(block);
+function loadHighScore() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = Number.parseInt(raw, 10);
+
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
     }
+  } catch {
+    // localStorage can be disabled or unavailable.
   }
 
-  slot.appendChild(pieceGrid);
+  return 0;
 }
 
-pieceSlots.forEach((slot, index) => {
-  slot.addEventListener('pointerdown', (e) => startDrag(e, index));
-});
-
-function startDrag(e, slotIndex) {
-  if (!currentPieces[slotIndex]) return;
-  audio.init();
-
-  const piece = currentPieces[slotIndex];
-  const boardCell = boardEl.firstElementChild.getBoundingClientRect();
-  const cellSize = boardCell.width;
-
-  const clone = document.createElement('div');
-  clone.classList.add('drag-clone', 'piece-grid');
-  const rows = piece.shape.length;
-  const cols = piece.shape[0].length;
-  clone.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
-  clone.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const block = document.createElement('div');
-      if (piece.shape[r][c]) {
-        block.classList.add('piece-block');
-        block.style.backgroundColor = piece.color;
-      }
-      clone.appendChild(block);
-    }
-  }
-
-  document.body.appendChild(clone);
-
-  dragState = {
-    slotIndex,
-    piece,
-    cloneEl: clone,
-    cellSize,
-    rows,
-    cols,
-    targetRow: null,
-    targetCol: null,
-    isValid: false
-  };
-
-  pieceSlots[slotIndex].style.visibility = 'hidden';
-  moveDrag(e);
-
-  window.addEventListener('pointermove', moveDrag);
-  window.addEventListener('pointerup', endDrag);
-  window.addEventListener('pointercancel', endDrag);
-}
-
-function moveDrag(e) {
-  if (!dragState) return;
-
-  const pointerYOffset = e.pointerType === 'touch' ? 70 : 0;
-  const x = e.clientX;
-  const y = e.clientY - pointerYOffset;
-
-  dragState.cloneEl.style.left = `${x}px`;
-  dragState.cloneEl.style.top = `${y}px`;
-
-  const boardRect = boardEl.getBoundingClientRect();
-  const relX = x - boardRect.left;
-  const relY = y - boardRect.top;
-
-  const targetCol = Math.round((relX - (dragState.cols * dragState.cellSize) / 2) / dragState.cellSize);
-  const targetRow = Math.round((relY - (dragState.rows * dragState.cellSize) / 2) / dragState.cellSize);
-
-  clearHighlights();
-
-  if (canPlacePiece(dragState.piece.shape, targetRow, targetCol)) {
-    dragState.targetRow = targetRow;
-    dragState.targetCol = targetCol;
-    dragState.isValid = true;
-    highlightPreview(dragState.piece.shape, targetRow, targetCol);
-  } else {
-    dragState.targetRow = null;
-    dragState.targetCol = null;
-    dragState.isValid = false;
+function saveHighScore() {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(state.highScore));
+  } catch {
+    // Gameplay continues without persistence.
   }
 }
 
-function endDrag() {
-  if (!dragState) return;
+function loadSoundPreference() {
+  try {
+    const raw = localStorage.getItem(SOUND_STORAGE_KEY);
 
-  window.removeEventListener('pointermove', moveDrag);
-  window.removeEventListener('pointerup', endDrag);
-  window.removeEventListener('pointercancel', endDrag);
-
-  if (dragState.isValid) {
-    placePiece(dragState.piece, dragState.targetRow, dragState.targetCol);
-    currentPieces[dragState.slotIndex] = null;
-    pieceSlots[dragState.slotIndex].innerHTML = '';
-    pieceSlots[dragState.slotIndex].style.visibility = 'visible';
-
-    audio.playPlace();
-    checkAndClearLines();
-
-    if (currentPieces.every(p => p === null)) {
-      spawnPieces();
+    if (raw === "false") {
+      return false;
     }
 
-    if (checkGameOver()) {
-      audio.playGameOver();
-      setTimeout(() => {
-        document.getElementById('final-score').textContent = score;
-        document.getElementById('final-high-score').textContent = highScore;
-        gameOverModal.classList.remove('hidden');
-      }, 400);
+    if (raw === "true") {
+      return true;
     }
-  } else {
-    pieceSlots[dragState.slotIndex].style.visibility = 'visible';
+  } catch {
+    // Ignore unavailable storage.
   }
 
-  clearHighlights();
-  if (dragState.cloneEl) dragState.cloneEl.remove();
-  dragState = null;
-}
-
-function canPlacePiece(shape, startRow, startCol) {
-  const rows = shape.length;
-  const cols = shape[0].length;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (shape[r][c]) {
-        const boardR = startRow + r;
-        const boardC = startCol + c;
-        if (boardR < 0 || boardR >= BOARD_SIZE || boardC < 0 || boardC >= BOARD_SIZE) {
-          return false;
-        }
-        if (boardState[boardR][boardC] !== null) {
-          return false;
-        }
-      }
-    }
-  }
   return true;
 }
 
-function highlightPreview(shape, startRow, startCol) {
-  for (let r = 0; r < shape.length; r++) {
-    for (let c = 0; c < shape[0].length; c++) {
-      if (shape[r][c]) {
-        const cell = boardEl.querySelector(`[data-row="${startRow + r}"][data-col="${startCol + c}"]`);
-        if (cell) cell.classList.add('preview-valid');
-      }
-    }
+function saveSoundPreference() {
+  try {
+    localStorage.setItem(
+      SOUND_STORAGE_KEY,
+      String(state.soundEnabled)
+    );
+  } catch {
+    // Ignore unavailable storage.
   }
 }
 
-function clearHighlights() {
-  const highlighted = boardEl.querySelectorAll('.preview-valid');
-  highlighted.forEach(el => el.classList.remove('preview-valid'));
+function updateHighScore() {
+  if (state.score > state.highScore) {
+    state.highScore = state.score;
+    saveHighScore();
+  }
+}
+
+/* =========================================================
+   PIECE GENERATION
+========================================================= */
+
+function createPiece() {
+  const shape = cloneMatrix(randomItem(SHAPES));
+
+  return {
+    id:
+      Date.now().toString(36) +
+      Math.random().toString(36).slice(2),
+    shape,
+    color: randomItem(COLORS)
+  };
+}
+
+function generatePieces() {
+  state.pieces = Array.from(
+    { length: PIECE_COUNT },
+    () => createPiece()
+  );
+}
+
+/* =========================================================
+   BOARD LOGIC
+========================================================= */
+
+function isInsideBoard(row, col) {
+  return (
+    row >= 0 &&
+    row < BOARD_SIZE &&
+    col >= 0 &&
+    col < BOARD_SIZE
+  );
+}
+
+function canPlacePiece(piece, startRow, startCol) {
+  if (!piece || !Array.isArray(piece.shape)) {
+    return false;
+  }
+
+  const cells = getShapeCells(piece.shape);
+
+  if (cells.length === 0) {
+    return false;
+  }
+
+  for (const cell of cells) {
+    const row = startRow + cell.row;
+    const col = startCol + cell.col;
+
+    if (!isInsideBoard(row, col)) {
+      return false;
+    }
+
+    if (state.board[row][col] !== null) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function findFirstValidPosition(piece) {
+  if (!piece) {
+    return null;
+  }
+
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (canPlacePiece(piece, row, col)) {
+        return { row, col };
+      }
+    }
+  }
+
+  return null;
+}
+
+function hasAnyMove() {
+  return state.pieces.some(piece => {
+    return findFirstValidPosition(piece) !== null;
+  });
 }
 
 function placePiece(piece, startRow, startCol) {
-  let blocksCount = 0;
-  for (let r = 0; r < piece.shape.length; r++) {
-    for (let c = 0; c < piece.shape[0].length; c++) {
-      if (piece.shape[r][c]) {
-        boardState[startRow + r][startCol + c] = piece.color;
-        blocksCount++;
-      }
-    }
-  }
-  updateScore(score + blocksCount * 10);
-  renderBoard();
-}
+  const cells = getShapeCells(piece.shape);
 
-function checkAndClearLines() {
-  const rowsToClear = [];
-  const colsToClear = [];
-
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    if (boardState[r].every(cell => cell !== null)) rowsToClear.push(r);
+  if (!canPlacePiece(piece, startRow, startCol)) {
+    return false;
   }
 
-  for (let c = 0; c < BOARD_SIZE; c++) {
-    let full = true;
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      if (boardState[r][c] === null) {
-        full = false;
-        break;
-      }
-    }
-    if (full) colsToClear.push(c);
+  for (const cell of cells) {
+    const row = startRow + cell.row;
+    const col = startCol + cell.col;
+
+    state.board[row][col] = piece.color;
   }
 
-  const totalLines = rowsToClear.length + colsToClear.length;
-
-  if (totalLines > 0) {
-    comboCount++;
-    audio.playClear(totalLines);
-
-    const clearedCells = new Set();
-    rowsToClear.forEach(r => {
-      for (let c = 0; c < BOARD_SIZE; c++) clearedCells.add(`${r}-${c}`);
-    });
-    colsToClear.forEach(c => {
-      for (let r = 0; r < BOARD_SIZE; r++) clearedCells.add(`${r}-${c}`);
-    });
-
-    clearedCells.forEach(key => {
-      const [r, c] = key.split('-').map(Number);
-      const cellEl = boardEl.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-      if (cellEl) cellEl.classList.add('clearing');
-    });
-
-    setTimeout(() => {
-      clearedCells.forEach(key => {
-        const [r, c] = key.split('-').map(Number);
-        boardState[r][c] = null;
-      });
-      renderBoard();
-    }, 300);
-
-    const points = totalLines * 100 * totalLines * comboCount;
-    updateScore(score + points);
-    showCombo(totalLines, comboCount);
-  } else {
-    comboCount = 0;
-  }
-}
-
-function showCombo(lines, combo) {
-  let text = `${lines} LINES!`;
-  if (combo > 1) text = `COMBO x${combo}!`;
-  comboPopupEl.textContent = text;
-  comboPopupEl.classList.add('show');
-  setTimeout(() => {
-    comboPopupEl.classList.remove('show');
-  }, 800);
-}
-
-function checkGameOver() {
-  const remaining = currentPieces.filter(p => p !== null);
-  if (remaining.length === 0) return false;
-
-  for (const piece of remaining) {
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      for (let c = 0; c < BOARD_SIZE; c++) {
-        if (canPlacePiece(piece.shape, r, c)) {
-          return false;
-        }
-      }
-    }
-  }
   return true;
 }
 
-function updateScore(newScore) {
-  score = newScore;
-  scoreEl.textContent = score;
-  if (score > highScore) {
-    highScore = score;
-    highScoreEl.textContent = highScore;
-    localStorage.setItem('block_blast_highscore', highScore);
+/* =========================================================
+   LINE CLEARING
+========================================================= */
+
+function findCompletedLines() {
+  const rows = [];
+  const columns = [];
+
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    let complete = true;
+
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (state.board[row][col] === null) {
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+      rows.push(row);
+    }
+  }
+
+  for (let col = 0; col < BOARD_SIZE; col++) {
+    let complete = true;
+
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      if (state.board[row][col] === null) {
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+      columns.push(col);
+    }
+  }
+
+  return { rows, columns };
+}
+
+function getClearedCellSet(lines) {
+  const cells = new Set();
+
+  for (const row of lines.rows) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      cells.add(`${row},${col}`);
+    }
+  }
+
+  for (const col of lines.columns) {
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      cells.add(`${row},${col}`);
+    }
+  }
+
+  return cells;
+}
+
+function clearCells(cells) {
+  for (const key of cells) {
+    const [row, col] = key.split(",").map(Number);
+
+    if (isInsideBoard(row, col)) {
+      state.board[row][col] = null;
+    }
   }
 }
 
-restartBtn.addEventListener('click', initGame);
+/* =========================================================
+   SCORING
+========================================================= */
 
-window.addEventListener('DOMContentLoaded', initGame);
-    
+function calculateLineScore(rows, columns, clearedCellCount) {
+  const lineCount = rows + columns;
+
+  if (lineCount <= 0) {
+    return 0;
+  }
+
+  const base =
+    clearedCellCount * 10 +
+    lineCount * 50 +
+    Math.max(0, lineCount - 1) * 35;
+
+  const multiplier = Math.max(1, state.combo);
+
+  return base * multiplier;
+}
+
+function addScore(points) {
+  if (!Number.isFinite(points) || points <= 0) {
+    return;
+  }
+
+  state.score += Math.floor(points);
+  updateHighScore();
+  renderScore();
+}
+
+function showScorePopup(points, clientX, clientY, combo = false) {
+  const popup = document.createElement("div");
+
+  popup.className = combo
+    ? "score-popup combo"
+    : "score-popup";
+
+  popup.textContent = combo
+    ? `COMBO ×${state.combo}`
+    : `+${formatNumber(points)}`;
+
+  const fallbackX = window.innerWidth / 2;
+  const fallbackY = window.innerHeight / 2;
+
+  popup.style.left = `${Number.isFinite(clientX) ? clientX : fallbackX}px`;
+  popup.style.top = `${Number.isFinite(clientY) ? clientY : fallbackY}px`;
+
+  scorePopupsElement.appendChild(popup);
+
+  window.setTimeout(() => {
+    popup.remove();
+  }, 850);
+}
+
+function renderScore() {
+  scoreElement.textContent = formatNumber(state.score);
+  highScoreElement.textContent = formatNumber(state.highScore);
+}
+
+/* =========================================================
+   RENDERING
+========================================================= */
+
+function renderBoard() {
+  boardElement.textContent = "";
+
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      const cell = document.createElement("div");
+
+      cell.className = "cell";
+      cell.dataset.row = String(row);
+      cell.dataset.col = String(col);
+      cell.setAttribute("role", "gridcell");
+
+      const color = state.board[row][col];
+
+      if (color !== null) {
+        cell.classList.add("occupied");
+        cell.style.background = color;
+      }
+
+      boardElement.appendChild(cell);
+    }
+  }
+}
+
+function createPieceVisual(piece, ghost = false) {
+  const container = document.createElement("div");
+
+  container.className = ghost
+    ? "drag-piece-grid"
+    : "piece-grid";
+
+  container.style.gridTemplateColumns =
+    `repeat(${piece.shape[0].length}, max-content)`;
+
+  container.style.gridTemplateRows =
+    `repeat(${piece.shape.length}, max-content)`;
+
+  for (let row = 0; row < piece.shape.length; row++) {
+    for (let col = 0; col < piece.shape[row].length; col++) {
+      const block = document.createElement("div");
+
+      if (piece.shape[row][col]) {
+        block.className = "piece-block";
+        block.style.background = piece.color;
+      } else {
+        block.style.visibility = "hidden";
+        block.className = "piece-block";
+      }
+
+      container.appendChild(block);
+    }
+  }
+
+  return container;
+}
+
+function renderPieces() {
+  pieceTrayElement.textContent = "";
+
+  state.pieces.forEach((piece, index) => {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "piece-button";
+    button.dataset.pieceId = piece.id;
+    button.dataset.index = String(index);
+
+    button.setAttribute(
+      "aria-label",
+      `Piece ${index + 1}, ${getShapeCells(piece.shape).length} blocks`
+    );
+
+    button.appendChild(createPieceVisual(piece));
+    button.addEventListener("pointerdown", handlePiecePointerDown);
+    button.addEventListener("keydown", handlePieceKeyDown);
+
+    pieceTrayElement.appendChild(button);
+  });
+}
+
+function renderAll() {
+  renderBoard();
+  renderPieces();
+  renderScore();
+  updateComboUI();
+}
+
+/* =========================================================
+   PREVIEW
+========================================================= */
+
+function clearPreview() {
+  const cells = boardElement.querySelectorAll(
+    ".preview-valid, .preview-invalid"
+  );
+
+  cells.forEach(cell => {
+    cell.classList.remove(
+      "preview-valid",
+      "preview-invalid"
+    );
+  });
+}
+
+function getBoardCellSize() {
+  const rect = boardElement.getBoundingClientRect();
+
+  const styles = window.getComputedStyle(boardElement);
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+  const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+  const gap = Number.parseFloat(styles.columnGap) || 0;
+
+  const usableWidth =
+    rect.width -
+    paddingLeft -
+    paddingRight -
+    gap * (BOARD_SIZE - 1);
+
+  const usableHeight =
+    rect.height -
+    paddingTop -
+    paddingBottom -
+    gap * (BOARD_SIZE - 1);
+
+  return {
+    width: usableWidth / BOARD_SIZE,
+    height: usableHeight / BOARD_SIZE,
+    rect,
+    paddingLeft,
+    paddingTop,
+    gap
+  };
+}
+
+function getBoardPositionFromPointer(clientX, clientY) {
+  const metrics = getBoardCellSize();
+
+  const localX =
+    clientX -
+    metrics.rect.left -
+    metrics.paddingLeft;
+
+  const localY =
+    clientY -
+    metrics.rect.top -
+    metrics.paddingTop;
+
+  const stepX = metrics.width + metrics.gap;
+  const stepY = metrics.height + metrics.gap;
+
+  const col = Math.floor(localX / stepX);
+  const row = Math.floor(localY / stepY);
+
+  return { row, col };
+}
+
+function updatePreview(clientX, clientY) {
+  clearPreview();
+
+  const drag = state.drag;
+
+  if (!drag || !drag.piece) {
+    return;
+  }
+
+  const position = getBoardPositionFromPointer(
+    clientX,
+    clientY
+  );
+
+  const startRow =
+    position.row - drag.anchorRow;
+
+  const startCol =
+    position.col - drag.anchorCol;
+
+  const valid = canPlacePiece(
+    drag.piece,
+    startRow,
+    startCol
+  );
+
+  for (const cell of getShapeCells(drag.piece.shape)) {
+    const row = startRow + cell.row;
+    const col = startCol + cell.col;
+
+    if (!isInsideBoard(row, col)) {
+      continue;
+    }
+
+    const boardCell = boardElement.querySelector(
+      `.cell[data-row="${row}"][data-col="${col}"]`
+    );
+
+    if (boardCell) {
+      boardCell.classList.add(
+        valid
+          ? "preview-valid"
+          : "preview-invalid"
+      );
+    }
+  }
+
+  drag.previewRow = startRow;
+  drag.previewCol = startCol;
+  drag.previewValid = valid;
+}
+
+/* =========================================================
+   DRAG GHOST
+========================================================= */
+
+function setupDragGhost(piece) {
+  dragGhost.textContent = "";
+
+  const visual = createPieceVisual(piece, true);
+
+  dragGhost.appendChild(visual);
+  dragGhost.style.gridTemplateColumns =
+    `repeat(${piece.shape[0].length}, max-content)`;
+  dragGhost.style.gridTemplateRows =
+    `repeat(${piece.shape.length}, max-content)`;
+
+  dragGhost.hidden = false;
+}
+
+function moveDragGhost(clientX, clientY) {
+  if (!state.drag) {
+    return;
+  }
+
+  const x =
+    clientX -
+    state.drag.ghostOffsetX;
+
+  const y =
+    clientY -
+    state.drag.ghostOffsetY;
+
+  dragGhost.style.left = `${x}px`;
+  dragGhost.style.top = `${y}px`;
+}
+
+function hideDragGhost() {
+  dragGhost.hidden = true;
+  dragGhost.textContent = "";
+}
+
+/* =========================================================
+   DRAGGING
+========================================================= */
+
+function getPieceFromElement(element) {
+  const button = element.closest(".piece-button");
+
+  if (!button) {
+    return null;
+  }
+
+  const pieceId = button.dataset.pieceId;
+
+  return state.pieces.find(
+    piece => piece.id === pieceId
+  ) || null;
+}
+
+function getPointerAnchor(event, button) {
+  const rect = button.getBoundingClientRect();
+
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
+
+  const piece = getPieceFromElement(button);
+
+  if (!piece) {
+    return { row: 0, col: 0 };
+  }
+
+  const cols = piece.shape[0].length;
+  const rows = piece.shape.length;
+
+  const visualWidth =
+    Math.max(1, rect.width - 16);
+
+  const visualHeight =
+    Math.max(1, rect.height - 16);
+
+  const cellWidth =
+    visualWidth / Math.max(1, cols);
+
+  const cellHeight =
+    visualHeight / Math.max(1, rows);
+
+  const col = Math.min(
+    cols - 1,
+    Math.max(0, Math.floor(
+      (localX - 8) / cellWidth
+    ))
+  );
+
+  const row = Math.min(
+    rows - 1,
+    Math.max(0, Math.floor(
+      (localY - 8) / cellHeight
+    ))
+  );
+
+  return { row, col };
+}
+
+function handlePiecePointerDown(event) {
+  if (
+    state.gameOver ||
+    state.inputLocked ||
+    state.drag
+  ) {
+    return;
+  }
+
+  if (event.button !== undefined && event.button !== 0) {
+    return;
+  }
+
+  const button = event.currentTarget;
+  const piece = getPieceFromElement(button);
+
+  if (!piece) {
+    return;
+  }
+
+  event.preventDefault();
+
+  initializeAudio();
+
+  const anchor = getPointerAnchor(event, button);
+  const rect = button.getBoundingClientRect();
+
+  state.drag = {
+    pointerId: event.pointerId,
+    piece,
+    pieceIndex: state.pieces.indexOf(piece),
+    anchorRow: anchor.row,
+    anchorCol: anchor.col,
+    ghostOffsetX: Math.min(
+      rect.width * 0.5,
+      Math.max(12, rect.width * 0.25)
+    ),
+    ghostOffsetY: Math.min(
+      rect.height * 0.35,
+      Math.max(10, rect.height * 0.2)
+    ),
+    previewRow: null,
+    previewCol: null,
+    previewValid: false,
+    sourceButton: button
+  };
+
+  button.classList.add("dragging");
+
+  try {
+    button.setPointerCapture(event.pointerId);
+  } catch {
+    // Pointer capture may fail on unusual browsers.
+  }
+
+  setupDragGhost(piece);
+  moveDragGhost(event.clientX, event.clientY);
+  updatePreview(event.clientX, event.clientY);
+
+  window.addEventListener(
+    "pointermove",
+    handleGlobalPointerMove,
+    { passive: false }
+  );
+
+  window.addEventListener(
+    "pointerup",
+    handleGlobalPointerUp,
+    { passive: false, once: true }
+  );
+
+  window.addEventListener(
+    "pointercancel",
+    handleGlobalPointerCancel,
+    { passive: false, once: true }
+  );
+}
+
+function handleGlobalPointerMove(event) {
+  if (!state.drag) {
+    return;
+  }
+
+  if (
+    state.drag.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+
+  moveDragGhost(event.clientX, event.clientY);
+  updatePreview(event.clientX, event.clientY);
+}
+
+function removeGlobalDragListeners() {
+  window.removeEventListener(
+    "pointermove",
+    handleGlobalPointerMove
+  );
+
+  window.removeEventListener(
+    "pointerup",
+    handleGlobalPointerUp
+  );
+
+  window.removeEventListener(
+    "pointercancel",
+    handleGlobalPointerCancel
+  );
+}
+
+function endDrag() {
+  const drag = state.drag;
+
+  if (!drag) {
+    return;
+  }
+
+  if (drag.sourceButton) {
+    drag.sourceButton.classList.remove("dragging");
+
+    try {
+      if (
+        drag.sourceButton.hasPointerCapture(
+          drag.pointerId
+        )
+      ) {
+        drag.sourceButton.releasePointerCapture(
+          drag.pointerId
+        );
+      }
+    } catch {
+      // Ignore pointer capture cleanup failures.
+    }
+  }
+
+  clearPreview();
+  hideDragGhost();
+  removeGlobalDragListeners();
+
+  state.drag = null;
+}
+
+function handleGlobalPointerUp(event) {
+  if (!state.drag) {
+    return;
+  }
+
+  if (
+    state.drag.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const drag = state.drag;
+
+  const valid =
+    drag.previewValid &&
+    Number.isInteger(drag.previewRow) &&
+    Number.isInteger(drag.previewCol) &&
+    canPlacePiece(
+      drag.piece,
+      drag.previewRow,
+      drag.previewCol
+    );
+
+  if (valid) {
+    const row = drag.previewRow;
+    const col = drag.previewCol;
+
+    endDrag();
+
+    performPlacement(
+      drag.piece,
+      drag.pieceIndex,
+      row,
+      col,
+      event.clientX,
+      event.clientY
+    );
+  } else {
+    endDrag();
+  }
+}
+
+function handleGlobalPointerCancel(event) {
+  if (!state.drag) {
+    return;
+  }
+
+  if (
+    state.drag.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  endDrag();
+}
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+
+function handlePieceKeyDown(event) {
+  if (
+    state.gameOver ||
+    state.inputLocked
+  ) {
+        return;
+  }
+
+  if (
+    event.key !== "Enter" &&
+    event.key !== " "
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+
+  initializeAudio();
+
+  const button = event.currentTarget;
+  const piece = getPieceFromElement(button);
+
+  if (!piece) {
+    return;
+  }
+
+  const index = state.pieces.indexOf(piece);
+  const position = findFirstValidPosition(piece);
+
+  if (!position) {
+    button.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(-5px)" },
+        { transform: "translateX(5px)" },
+        { transform: "translateX(0)" }
+      ],
+      { duration: 180 }
+    );
+
+    return;
+  }
+
+  performPlacement(
+    piece,
+    index,
+    position.row,
+    position.col,
+    window.innerWidth / 2,
+    window.innerHeight / 2
+  );
+}
+
+/* =========================================================
+   PLACEMENT FLOW
+========================================================= */
+
+async function performPlacement(
+  piece,
+  pieceIndex,
+  row,
+  col,
+  popupX,
+  popupY
+) {
+  if (
+    state.gameOver ||
+    state.inputLocked ||
+    !piece
+  ) {
+    return;
+  }
+
+  if (
+    !Number.isInteger(pieceIndex) ||
+    state.pieces[pieceIndex]?.id !== piece.id
+  ) {
+    return;
+  }
+
+  if (!canPlacePiece(piece, row, col)) {
+    return;
+  }
+
+  state.inputLocked = true;
+
+  const placedCells = getShapeCells(piece.shape).length;
+
+  const placed = placePiece(
+    piece,
+    row,
+    col
+  );
+
+  if (!placed) {
+    state.inputLocked = false;
+    return;
+  }
+
+  addScore(placedCells * 5);
+  showScorePopup(
+    placedCells * 5,
+    popupX,
+    popupY
+  );
+
+  playPlaceSound();
+
+  state.pieces.splice(pieceIndex, 1);
+
+  renderBoard();
+  renderPieces();
+
+  await resolveLines();
+
+  if (!state.gameOver) {
+    while (state.pieces.length < PIECE_COUNT) {
+      state.pieces.push(createPiece());
+    }
+
+    renderPieces();
+
+    checkGameOver();
+  }
+
+  state.inputLocked = false;
+}
+
+/* =========================================================
+   LINE RESOLUTION
+========================================================= */
+
+async function resolveLines() {
+  const lines = findCompletedLines();
+
+  if (
+    lines.rows.length === 0 &&
+    lines.columns.length === 0
+  ) {
+    state.combo = 0;
+    updateComboUI();
+    return;
+  }
+
+  state.combo += 1;
+  updateComboUI();
+
+  const clearedCells = getClearedCellSet(lines);
+
+  const points = calculateLineScore(
+    lines.rows.length,
+    lines.columns.length,
+    clearedCells.size
+  );
+
+  addScore(points);
+
+  showScorePopup(
+    points,
+    window.innerWidth / 2,
+    window.innerHeight * 0.45
+  );
+
+  if (state.combo > 1) {
+    showScorePopup(
+      0,
+      window.innerWidth / 2,
+      window.innerHeight * 0.45,
+      true
+    );
+
+    playComboSound(state.combo);
+  } else {
+    playClearSound(
+      lines.rows.length + lines.columns.length
+    );
+  }
+
+  markCellsAsClearing(clearedCells);
+
+  await delay(CLEAR_ANIMATION_MS);
+
+  clearCells(clearedCells);
+  renderBoard();
+}
+
+function markCellsAsClearing(cells) {
+  for (const key of cells) {
+    const [row, col] = key.split(",").map(Number);
+
+    const boardCell = boardElement.querySelector(
+      `.cell[data-row="${row}"][data-col="${col}"]`
+    );
+
+    if (boardCell) {
+      boardCell.classList.add("clearing");
+    }
+  }
+}
+
+function updateComboUI() {
+  if (state.combo > 0) {
+    comboBadge.hidden = false;
+    comboValueElement.textContent =
+      String(state.combo);
+  } else {
+    comboBadge.hidden = true;
+  }
+}
+
+/* =========================================================
+   GAME OVER
+========================================================= */
+
+function checkGameOver() {
+  if (state.gameOver) {
+    return true;
+  }
+
+  if (state.pieces.length === 0) {
+    return false;
+  }
+
+  if (hasAnyMove()) {
+    return false;
+  }
+
+  triggerGameOver();
+  return true;
+}
+
+function triggerGameOver() {
+  if (state.gameOver) {
+    return;
+  }
+
+  state.gameOver = true;
+  state.inputLocked = true;
+
+  if (state.drag) {
+    endDrag();
+  }
+
+  updateHighScore();
+  renderScore();
+
+  finalScoreElement.textContent =
+    formatNumber(state.score);
+
+  finalHighScoreElement.textContent =
+    formatNumber(state.highScore);
+
+  gameOverOverlay.hidden = false;
+
+  playGameOverSound();
+
+  window.setTimeout(() => {
+    restartButton.focus();
+  }, 50);
+}
+
+/* =========================================================
+   RESTART
+========================================================= */
+
+function restartGame() {
+  if (state.drag) {
+    endDrag();
+  }
+
+  state.gameOver = false;
+  state.inputLocked = true;
+  state.score = 0;
+  state.combo = 0;
+  state.board = createEmptyBoard();
+
+  generatePieces();
+
+  gameOverOverlay.hidden = true;
+
+  renderAll();
+
+  window.setTimeout(() => {
+    state.inputLocked = false;
+    checkGameOver();
+  }, 80);
+}
+
+/* =========================================================
+   AUDIO
+========================================================= */
+
+function initializeAudio() {
+  if (!state.soundEnabled) {
+    return;
+  }
+
+  try {
+    if (!state.audioContext) {
+      const AudioContextClass =
+        window.AudioContext ||
+        window.webkitAudioContext;
+
+      if (!AudioContextClass) {
+        return;
+      }
+
+      state.audioContext =
+        new AudioContextClass();
+
+      state.audioMaster =
+        state.audioContext.createGain();
+
+      state.audioMaster.gain.value = 0.12;
+      state.audioMaster.connect(
+        state.audioContext.destination
+      );
+    }
+
+    if (
+      state.audioContext.state === "suspended"
+    ) {
+      state.audioContext.resume().catch(() => {});
+    }
+  } catch {
+    state.audioContext = null;
+    state.audioMaster = null;
+  }
+}
+
+function createTone(
+  frequency,
+  duration,
+  type = "sine",
+  volume = 0.25,
+  endFrequency = frequency
+) {
+  if (
+    !state.soundEnabled ||
+    !state.audioContext ||
+    !state.audioMaster
+  ) {
+    return;
+  }
+
+  try {
+    const context = state.audioContext;
+    const oscillator =
+      context.createOscillator();
+
+    const gain =
+      context.createGain();
+
+    const now = context.currentTime;
+    const end = now + duration;
+
+    oscillator.type = type;
+
+    oscillator.frequency.setValueAtTime(
+      frequency,
+      now
+    );
+
+    oscillator.frequency.exponentialRampToValueAtTime(
+      Math.max(20, endFrequency),
+      end
+    );
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      now
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(0.0001, volume),
+      now + 0.008
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      end
+    );
+
+    oscillator.connect(gain);
+    gain.connect(state.audioMaster);
+
+    oscillator.start(now);
+    oscillator.stop(end + 0.01);
+  } catch {
+    // Audio must never break gameplay.
+  }
+}
+
+function playPlaceSound() {
+  initializeAudio();
+
+  createTone(
+    430,
+    0.07,
+    "sine",
+    0.25,
+    650
+  );
+}
+
+function playClearSound(lineCount) {
+  initializeAudio();
+
+  const count = Math.max(
+    1,
+    Math.min(5, lineCount)
+  );
+
+  createTone(
+    500 + count * 35,
+    0.12,
+    "triangle",
+    0.3,
+    820 + count * 45
+  );
+
+  window.setTimeout(() => {
+    createTone(
+      720 + count * 40,
+      0.11,
+      "sine",
+      0.22,
+      1050 + count * 50
+    );
+  }, 65);
+}
+
+function playComboSound(combo) {
+  initializeAudio();
+
+  const intensity =
+    Math.min(6, Math.max(2, combo));
+
+  createTone(
+    650 + intensity * 35,
+    0.09,
+    "triangle",
+    0.3,
+    1050 + intensity * 50
+  );
+
+  window.setTimeout(() => {
+    createTone(
+      900 + intensity * 40,
+      0.1,
+      "triangle",
+      0.25,
+      1300 + intensity * 55
+    );
+  }, 70);
+}
+
+function playGameOverSound() {
+  initializeAudio();
+
+  createTone(
+    390,
+    0.16,
+    "sine",
+    0.25,
+    250
+  );
+
+  window.setTimeout(() => {
+    createTone(
+      240,
+      0.2,
+      "sine",
+      0.2,
+      120
+    );
+  }, 125);
+}
+
+function toggleSound() {
+  state.soundEnabled =
+    !state.soundEnabled;
+
+  soundIcon.textContent =
+    state.soundEnabled ? "🔊" : "🔇";
+
+  soundButton.setAttribute(
+    "aria-pressed",
+    String(state.soundEnabled)
+  );
+
+  saveSoundPreference();
+
+  if (state.soundEnabled) {
+    initializeAudio();
+    createTone(
+      600,
+      0.08,
+      "sine",
+      0.18,
+      760
+    );
+  }
+}
+
+/* =========================================================
+   SERVICE WORKER
+========================================================= */
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .catch(() => {
+        // The game remains fully playable without SW.
+      });
+  });
+}
+
+/* =========================================================
+   GLOBAL SAFETY
+========================================================= */
+
+function handleVisibilityChange() {
+  if (
+    document.hidden &&
+    state.drag
+  ) {
+    endDrag();
+  }
+}
+
+function handleWindowBlur() {
+  if (state.drag) {
+    endDrag();
+  }
+}
+
+function handleUnexpectedPointerUp() {
+  if (state.drag) {
+    endDrag();
+  }
+}
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
+function initializeGame() {
+  state.highScore = loadHighScore();
+  state.soundEnabled = loadSoundPreference();
+
+  state.board = createEmptyBoard();
+  generatePieces();
+
+  soundIcon.textContent =
+    state.soundEnabled ? "🔊" : "🔇";
+
+  soundButton.setAttribute(
+    "aria-pressed",
+    String(state.soundEnabled)
+  );
+
+  renderAll();
+
+  soundButton.addEventListener(
+    "click",
+    toggleSound
+  );
+
+  restartButton.addEventListener(
+    "click",
+    () => {
+      initializeAudio();
+      playPlaceSound();
+      restartGame();
+    }
+  );
+
+  document.addEventListener(
+    "visibilitychange",
+    handleVisibilityChange
+  );
+
+  window.addEventListener(
+    "blur",
+    handleWindowBlur
+  );
+
+  window.addEventListener(
+    "pointerup",
+    handleUnexpectedPointerUp
+  );
+
+  window.addEventListener(
+    "pointercancel",
+    handleUnexpectedPointerUp
+  );
+
+  window.addEventListener(
+    "keydown",
+    event => {
+      if (
+        event.key === "r" ||
+        event.key === "R"
+      ) {
+        if (state.gameOver) {
+          event.preventDefault();
+          initializeAudio();
+          restartGame();
+        }
+      }
+    }
+  );
+
+  registerServiceWorker();
+
+  checkGameOver();
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  initializeGame
+);
