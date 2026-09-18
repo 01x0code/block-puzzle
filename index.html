@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Block Blast</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f111a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236C5CE7'/><rect x='20' y='20' width='25' height='25' rx='5' fill='%2300CEC9'/><rect x='55' y='20' width='25' height='25' rx='5' fill='%23FF7675'/><rect x='20' y='55' width='25' height='25' rx='5' fill='%23FDCB6E'/><rect x='55' y='55' width='25' height='25' rx='5' fill='%2300B894'/></svg>">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="title-container">
+        <h1>BLOCK<span class="highlight">BLAST</span></h1>
+      </div>
+      <div class="score-board">
+        <div class="score-box">
+          <span class="score-label">SCORE</span>
+          <span id="score" class="score-value">0</span>
+        </div>
+        <div class="score-box">
+          <span class="score-label">BEST</span>
+          <span id="high-score" class="score-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="game-container">
+      <div id="board" class="board"></div>
+      <div id="pieces-container" class="pieces-container">
+        <div class="piece-slot" data-slot="0"></div>
+        <div class="piece-slot" data-slot="1"></div>
+        <div class="piece-slot" data-slot="2"></div>
+      </div>
+    </main>
+
+    <div id="combo-popup" class="combo-popup hidden"></div>
+
+    <div id="game-over-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>GAME OVER</h2>
+        <div class="final-score-container">
+          <div class="final-score-item">
+            <span>Score</span>
+            <span id="final-score">0</span>
+          </div>
+          <div class="final-score-item">
+            <span>Best</span>
+            <span id="final-high-score">0</span>
+          </div>
+        </div>
+        <button id="restart-btn" class="btn">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('ServiceWorker registered:', reg.scope))
+          .catch(err => console.error('ServiceWorker failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
