@@ -2,71 +2,108 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Block Blast</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f111a">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151827">
+  <meta name="description" content="A polished Block Blast-style puzzle game.">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236C5CE7'/><rect x='20' y='20' width='25' height='25' rx='5' fill='%2300CEC9'/><rect x='55' y='20' width='25' height='25' rx='5' fill='%23FF7675'/><rect x='20' y='55' width='25' height='25' rx='5' fill='%23FDCB6E'/><rect x='55' y='55' width='25' height='25' rx='5' fill='%2300B894'/></svg>">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./style.css">
+  <title>Block Blast</title>
 </head>
 <body>
-  <div id="app">
-    <header class="header">
-      <div class="title-container">
-        <h1>BLOCK<span class="highlight">BLAST</span></h1>
-      </div>
-      <div class="score-board">
-        <div class="score-box">
-          <span class="score-label">SCORE</span>
-          <span id="score" class="score-value">0</span>
-        </div>
-        <div class="score-box">
-          <span class="score-label">BEST</span>
-          <span id="high-score" class="score-value">0</span>
+  <main class="app" aria-label="Block Blast game">
+    <header class="game-header">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">◆</div>
+        <div>
+          <h1>BLOCK BLAST</h1>
+          <p>Place. Clear. Blast.</p>
         </div>
       </div>
+
+      <button
+        id="soundButton"
+        class="icon-button"
+        type="button"
+        aria-label="Toggle sound"
+        aria-pressed="true"
+      >
+        <span id="soundIcon" aria-hidden="true">🔊</span>
+      </button>
     </header>
 
-    <main class="game-container">
-      <div id="board" class="board"></div>
-      <div id="pieces-container" class="pieces-container">
-        <div class="piece-slot" data-slot="0"></div>
-        <div class="piece-slot" data-slot="1"></div>
-        <div class="piece-slot" data-slot="2"></div>
+    <section class="score-panel" aria-label="Score">
+      <div class="score-card">
+        <span class="score-label">SCORE</span>
+        <strong id="score">0</strong>
       </div>
-    </main>
 
-    <div id="combo-popup" class="combo-popup hidden"></div>
+      <div class="score-card">
+        <span class="score-label">BEST</span>
+        <strong id="highScore">0</strong>
+      </div>
+    </section>
 
-    <div id="game-over-modal" class="modal hidden">
-      <div class="modal-content">
-        <h2>GAME OVER</h2>
-        <div class="final-score-container">
-          <div class="final-score-item">
-            <span>Score</span>
-            <span id="final-score">0</span>
+    <section class="combo-area" aria-live="polite">
+      <div id="comboBadge" class="combo-badge" hidden>
+        COMBO ×<span id="comboValue">2</span>
+      </div>
+    </section>
+
+    <section
+      id="board"
+      class="board"
+      role="grid"
+      aria-label="8 by 8 game board"
+      tabindex="0"
+    ></section>
+
+    <section class="tray-section" aria-label="Available pieces">
+      <div class="tray-title">
+        <span>CHOOSE A BLOCK</span>
+        <span class="hint">Drag to board</span>
+      </div>
+
+      <div id="pieceTray" class="piece-tray"></div>
+    </section>
+
+    <div id="scorePopups" class="score-popups" aria-hidden="true"></div>
+
+    <div
+      id="gameOverOverlay"
+      class="overlay"
+      hidden
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="gameOverTitle"
+    >
+      <div class="game-over-card">
+        <div class="game-over-icon" aria-hidden="true">✦</div>
+        <p class="over-eyebrow">NO MORE MOVES</p>
+        <h2 id="gameOverTitle">GAME OVER</h2>
+
+        <div class="final-scores">
+          <div>
+            <span>SCORE</span>
+            <strong id="finalScore">0</strong>
           </div>
-          <div class="final-score-item">
-            <span>Best</span>
-            <span id="final-high-score">0</span>
+          <div>
+            <span>BEST</span>
+            <strong id="finalHighScore">0</strong>
           </div>
         </div>
-        <button id="restart-btn" class="btn">Play Again</button>
+
+        <button id="restartButton" class="restart-button" type="button">
+          PLAY AGAIN
+        </button>
       </div>
     </div>
-  </div>
 
-  <script src="game.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('ServiceWorker registered:', reg.scope))
-          .catch(err => console.error('ServiceWorker failed:', err));
-      });
-    }
-  </script>
+    <div id="dragGhost" class="drag-ghost" hidden aria-hidden="true"></div>
+  </main>
+
+  <script src="./game.js" defer></script>
 </body>
 </html>
